@@ -1,11 +1,11 @@
 ﻿using System.Data;
 using System.Text;
 
-string dataFolder = @"C:\Users\ave\Desktop\data";  //Location of data folder
-FileInfo[] clicksFolder = new DirectoryInfo($"{dataFolder}\\clicks").GetFiles();
-FileInfo[] usersFolder = new DirectoryInfo($"{dataFolder}\\users").GetFiles();
+string dataFolder = @"C:\Users\ave\Desktop\data";  //Location of data folder 
 string country = null; // Country filter
 
+FileInfo[] clicksFolder = new DirectoryInfo($"{dataFolder}\\clicks").GetFiles();
+FileInfo[] usersFolder = new DirectoryInfo($"{dataFolder}\\users").GetFiles();
 Dictionary<string, int> dailyClicks = new();
 Dictionary<string, string> idToCountry = new();
 
@@ -21,7 +21,7 @@ if (country != null)
         {
             string[] parts = usersReader.ReadLine().Split(',');
             string requiredPart = parts[dataCollumn["id"]];
-            lock (idToCountry) //Locking dictionary so that parallel tasks wouldn't check/append dictionary at the same time
+            lock (idToCountry) //Locking dictionary so that parallel tasks wouldn't check/append the dictionary at the same time
             {
                 if (idToCountry.ContainsKey(requiredPart))
                 {
@@ -38,11 +38,6 @@ if (country != null)
 }
 
 Parallel.ForEach(clicksFolder, clickInfoFile =>
-{
-    UpdateClickCount(clickInfoFile);
-});
-
-void UpdateClickCount(FileInfo clickInfoFile)
 {
     using StreamReader reader = new(clickInfoFile.FullName);
     int i = 0;
@@ -77,9 +72,9 @@ void UpdateClickCount(FileInfo clickInfoFile)
         }
 
     }
-}
+});
 
-WriteToCsv(string.IsNullOrEmpty(country), dailyClicks, dataFolder);
+WriteToCsv(!string.IsNullOrEmpty(country), dailyClicks, dataFolder);
 
 //Assigning correct collumn number as received data is not always in the same format
 void AssignCollumnNumber(string[] collumn, int i, out Dictionary<string, int> dataCollumn)
@@ -94,9 +89,9 @@ void AssignCollumnNumber(string[] collumn, int i, out Dictionary<string, int> da
 
 void WriteToCsv(bool hasFilter, Dictionary<string, int> dailyClicks, string dataFolder)
 {
-    string path = hasFilter ? "total_clicks" : "filtered_clicks";
+    string fileName = hasFilter ? "filtered_clicks" : "total_clicks";
 
-    DataTable dt = new() { TableName = path };
+    DataTable dt = new() { TableName = fileName };
     dt.Columns.Add("date");
     dt.Columns.Add("count");
     StringBuilder sb = new();
@@ -113,5 +108,5 @@ void WriteToCsv(bool hasFilter, Dictionary<string, int> dailyClicks, string data
         sb.AppendLine(string.Join(",", fields));
     }
 
-    File.WriteAllText($"{dataFolder}\\{path}.csv", sb.ToString());
+    File.WriteAllText($"{dataFolder}\\{fileName}.csv", sb.ToString());
 }
