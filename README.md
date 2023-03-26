@@ -1,1 +1,1 @@
-# Data_engineering
+A simple custom MapReduce framework mainly using dictionaries. For the program to work properly you should specify the location of the data folder. If the clicks should be sorted by country also specify the country, if not, string country can be left empty or null.
