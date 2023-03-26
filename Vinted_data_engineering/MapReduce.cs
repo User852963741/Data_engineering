@@ -2,8 +2,8 @@
 using System.Text;
 
 string dataFolder = @"C:\Users\ave\Desktop\data";  //Location of data folder
-var clicksFolder = new DirectoryInfo($"{dataFolder}\\clicks").GetFiles();
-var usersFolder = new DirectoryInfo($"{dataFolder}\\users").GetFiles();
+FileInfo[] clicksFolder = new DirectoryInfo($"{dataFolder}\\clicks").GetFiles();
+FileInfo[] usersFolder = new DirectoryInfo($"{dataFolder}\\users").GetFiles();
 string country = null; // Country filter
 
 Dictionary<string, int> dailyClicks = new();
@@ -13,15 +13,15 @@ if (country != null)
 {
     Parallel.ForEach(usersFolder, user =>
     {
-        using var usersReader = new StreamReader(user.FullName);
+        using StreamReader usersReader = new(user.FullName);
         int i = 0;
         AssignCollumnNumber(usersReader.ReadLine().Split(','), i, out Dictionary<string, int> dataCollumn);
 
         while (usersReader.EndOfStream == false)
         {
             string[] parts = usersReader.ReadLine().Split(',');
-            var requiredPart = parts[dataCollumn["id"]];
-            lock (idToCountry) //Locking dictionary so that parallel tasks wouldn't check/append dictionary at he same time
+            string requiredPart = parts[dataCollumn["id"]];
+            lock (idToCountry) //Locking dictionary so that parallel tasks wouldn't check/append dictionary at the same time
             {
                 if (idToCountry.ContainsKey(requiredPart))
                 {
@@ -44,40 +44,38 @@ Parallel.ForEach(clicksFolder, clickInfoFile =>
 
 void UpdateClickCount(FileInfo clickInfoFile)
 {
-    using (var reader = new StreamReader(clickInfoFile.FullName))
-    {
-        int i = 0;
-        AssignCollumnNumber(reader.ReadLine().Split(','), i, out Dictionary<string, int> dataCollumn);
+    using StreamReader reader = new(clickInfoFile.FullName);
+    int i = 0;
+    AssignCollumnNumber(reader.ReadLine().Split(','), i, out Dictionary<string, int> dataCollumn);
 
-        while (reader.EndOfStream == false)
+    while (reader.EndOfStream == false)
+    {
+        string[] parts = reader.ReadLine().Split(',');
+        string requiredPart = parts[dataCollumn["date"]];
+        string userId = parts[dataCollumn["user_id"]];
+        lock (dailyClicks)
         {
-            string[] parts = reader.ReadLine().Split(',');
-            var requiredPart = parts[dataCollumn["date"]];
-            var userId = parts[dataCollumn["user_id"]];
-            lock (dailyClicks)
+            if (dailyClicks.ContainsKey(requiredPart) && (string.IsNullOrEmpty(country) || idToCountry.ContainsKey(userId) && idToCountry[userId] == country))
             {
-                if (dailyClicks.ContainsKey(requiredPart) && (string.IsNullOrEmpty(country) || idToCountry.ContainsKey(userId) && idToCountry[userId] == country))
+                dailyClicks[requiredPart]++;
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(country) || idToCountry.ContainsKey(userId) && idToCountry[userId] == country)
                 {
-                    dailyClicks[requiredPart]++;
+                    dailyClicks[requiredPart] = 1;
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(country) || idToCountry.ContainsKey(userId) && idToCountry[userId] == country)
+                    if (!dailyClicks.ContainsKey(requiredPart))
                     {
-                        dailyClicks[requiredPart] = 1;
-                    }
-                    else
-                    {
-                        if (!dailyClicks.ContainsKey(requiredPart))
-                        {
-                            // If there are no clicks from the specified country that day it should still show up in the list with the count 0
-                            dailyClicks[requiredPart] = 0;
-                        }
+                        // If there are no clicks from the specified country that day it should still show up in the list with the count 0
+                        dailyClicks[requiredPart] = 0;
                     }
                 }
             }
-
         }
+
     }
 }
 
@@ -87,7 +85,7 @@ WriteToCsv(string.IsNullOrEmpty(country), dailyClicks, dataFolder);
 void AssignCollumnNumber(string[] collumn, int i, out Dictionary<string, int> dataCollumn)
 {
     dataCollumn = new Dictionary<string, int>();
-    foreach (var item in collumn)
+    foreach (string item in collumn)
     {
         dataCollumn[item] = i;
         i++;
@@ -96,19 +94,19 @@ void AssignCollumnNumber(string[] collumn, int i, out Dictionary<string, int> da
 
 void WriteToCsv(bool hasFilter, Dictionary<string, int> dailyClicks, string dataFolder)
 {
-    var path = hasFilter ? "total_clicks" : "filtered_clicks";
+    string path = hasFilter ? "total_clicks" : "filtered_clicks";
 
-    DataTable dt = new DataTable { TableName = path };
+    DataTable dt = new() { TableName = path };
     dt.Columns.Add("date");
     dt.Columns.Add("count");
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new();
 
     string[] columnNames = dt.Columns.Cast<DataColumn>().Select(column => column.ColumnName).ToArray();
     sb.AppendLine(string.Join(",", columnNames));
 
-    foreach (var pair in dailyClicks)
+    foreach (KeyValuePair<string, int> pair in dailyClicks)
     {
-        var row = dt.NewRow();
+        DataRow row = dt.NewRow();
         row["date"] = pair.Key;
         row["count"] = pair.Value;
         string?[] fields = row.ItemArray.Select(field => field.ToString()).ToArray();
